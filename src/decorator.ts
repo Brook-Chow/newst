@@ -85,12 +85,9 @@ function createRoute(
   Reflect.defineMetadata('moduleRoutes', routes, target.constructor);
 }
 
-interface NewstContext extends Context {
-  verifyParams: (arg0: object) => Promise<any>;
-}
 
 export class Controller {
-  ctx!: NewstContext;
+  ctx!: Context;
   moduleAuth!: boolean;
   modulePath!: string;
   moduleName!: string;

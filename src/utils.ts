@@ -43,7 +43,6 @@ export function signJwt(
   socket: any,
   next: any,
   secret: string,
-  unsignedHost: string[],
   unsignedDelay: number
 ) {
   const token = socket.handshake.headers.authorization;
@@ -56,16 +55,12 @@ export function signJwt(
       next();
     });
   } else {
-    const clientHost = new URL(socket.handshake.headers.origin).host;
 
-    if (!unsignedHost.includes(clientHost)) {
-      return next(new Error('Authentication error'));
-    }
-    if(!socket.handshake.query.cert){
+    if (!socket.handshake.query.cert) {
       return next(new Error('Authentication error'));
     }
 
-    socket.decoded = { id: socket.handshake.query.cert};
+    socket.decoded = { id: socket.handshake.query.cert };
 
     let disconnectTimer = setTimeout(() => {
       socket.disconnect(true);

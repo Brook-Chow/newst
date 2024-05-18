@@ -1,3 +1,5 @@
+/// <reference path="../index.d.ts" />
+
 import Application, { Context, Middleware, BaseRequest, BaseContext } from 'koa';
 import {Server} from 'socket.io'
 import { ValidateSubmit } from './dist/utils';
@@ -5,48 +7,44 @@ import { CreateServer } from './dist/main';
 import { Module, Get, Put, Post, Delete } from './dist/decorator';
 import { ClassConstructor } from 'class-transformer';
 
-interface Request extends BaseRequest {
-  body: any;
-  files: any;
-}
- 
-interface IContext extends BaseContext {
-  permissionRoutes:any[]
-  socketIO:Server
-}
+type Request<T, U> = BaseRequest & { body: T } & { files: U };
 
-interface App extends Application {
-  context:IContext
-}
 
-interface NewstContext extends Context {
-  verifyParams: (arg0: object) => Promise<any>;
-  request: Request;
-  app:App
-}
+type IContext = BaseContext & { permissionRoutes: any[], socketIO: Server };
+
+type App = Application & { context: IContext };
+
+type NewstContext = Context & { request: Request<any, any>, app:App};
+
 
 type Opt = {
   _auth?: boolean;
   _path?: string;
   _name?: string;
 };
-type AccessHeader = {
+
+export type AccessHeader = {
   'Access-Control-Allow-Origin'?: string;
   'Access-Control-Allow-Headers'?: string;
   'Access-Control-Allow-Methods'?: string;
 };
 
+export interface ControllerType {
+  new (): Controller;
+}
+
+
 export function CreateServer(options: {
   port: number;
-  controllers: any[];
+  controllers: ControllerType[];
   middlewares?: Middleware[];
+  routerMiddwares?: Middleware[];
   jwt?: {
     enable: boolean;
     secret: string;
+    fields:string[]
   };
   socketIoConfig?: {
-    allow:boolean,
-    unsignedHost:string[],
     unsignedDelay:number
   }
   cors?: AccessHeader;

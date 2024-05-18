@@ -1,7 +1,7 @@
 {
   "name": "newst",
-  "version": "2.3.6",
-  "main": "./dist/index.js",
+  "version": "2.4.3",
+  "main": ".",
   "license": "MIT",
   "scripts": {
     "build": "babel src --out-dir dist --extensions \".ts\" --source-maps inline"

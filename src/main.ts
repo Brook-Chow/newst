@@ -5,50 +5,44 @@ import Router from 'koa-router';
 import KoaBody from 'koa-body';
 import KoaStatic from 'koa-static';
 import { checkJwt, signJwt } from './utils';
-import path from 'path'
+import path from 'path';
+import { AccessHeader, ControllerType } from '..';
 const router = new Router({ strict: true });
 
-type AccessHeader = {
-  'Access-Control-Allow-Origin'?: string;
-  'Access-Control-Allow-Headers'?: string;
-  'Access-Control-Allow-Methods'?: string;
-};
 
 type AccessMethod = 'get' | 'put' | 'post' | 'delete';
 
-
 export function CreateServer(options: {
   port: number;
-  controllers: any[];
+  controllers: ControllerType[];
   middlewares?: Middleware[];
   jwt?: {
     enable: boolean;
     secret: string;
+    fields: string[];
   };
+  routerMiddwares?: Middleware[];
   socketIoConfig?: {
-    allow:boolean,
-    unsignedHost:string[],
-    unsignedDelay:number
-  }
+    unsignedDelay: number;
+  };
   cors?: AccessHeader;
   staticDir: string;
-  uploadConfig:{
+  uploadConfig: {
     uploadDir: string;
     maxFileSize: number;
-    allowExts:string[]
-  }
+    allowExts: string[];
+  };
 }) {
   let routes = [];
   for (let builder of options.controllers) {
-
-    const instance  = {
+    const instance = {
       moduleName: Reflect.getMetadata('moduleName', builder),
       modulePath: Reflect.getMetadata('modulePath', builder),
       moduleAuth: Reflect.getMetadata('moduleAuth', builder),
       moduleRoutes: Reflect.getMetadata('moduleRoutes', builder),
-    }
-    
-    if(!instance.moduleRoutes || instance.moduleRoutes.length===0){
+    };
+
+    if (!instance.moduleRoutes || instance.moduleRoutes.length === 0) {
       continue;
     }
     instance.moduleRoutes.sort(
@@ -75,7 +69,8 @@ export function CreateServer(options: {
               instance.moduleRoutes[key].method
             }  ${new Date().toLocaleString()}  `
           );
-          Object.keys(ctx.request.body).length > 0 &&
+          ctx.request.body &&
+            Object.keys(ctx.request.body).length > 0 &&
             console.table(ctx.request.body);
           ctx.query && console.table(ctx.query);
           ctx.param && console.table(ctx.param);
@@ -88,11 +83,16 @@ export function CreateServer(options: {
             await next();
           } else {
             try {
-              let { id, email, roleId } = await checkJwt(
-                ctx,
-                options.jwt?.secret || ''
-              );
-              ctx.state.user = { id, email, roleId };
+              let signInfo = await checkJwt(ctx, options.jwt?.secret || '');
+
+              let fliterObjects: any = {};
+
+              for (let key of options.jwt.fields) {
+                if (signInfo.hasOwnProperty(key)) {
+                  fliterObjects[key] = signInfo[key];
+                }
+              }
+              ctx.state.user = fliterObjects;
               await next();
             } catch (error) {
               console.log(error);
@@ -105,6 +105,7 @@ export function CreateServer(options: {
             }
           }
         },
+        ...(options.routerMiddwares||[]),
         async (ctx: Context, next: any) => {
           try {
             return await instance.moduleRoutes[key].fn.apply({ ctx });
@@ -136,15 +137,18 @@ export function CreateServer(options: {
           keepExtensions: true,
           maxFileSize: options.uploadConfig.maxFileSize * 1024,
           onFileBegin(name, file) {
-            let ext = path.extname(<string>file.originalFilename)
-            if(options.uploadConfig.allowExts.includes(ext.substring(1).toLowerCase())){
-              throw new Error('not allow ext')
-            }else{
-              return file
+            let ext = path.extname(<string>file.originalFilename);
+            if (
+              !options.uploadConfig.allowExts.includes(
+                ext.substring(1).toLowerCase()
+              )
+            ) {
+              throw new Error('not allow ext');
+            } else {
+              return file;
             }
           },
-        }
-       
+        },
       })
     )
     .use(KoaStatic(options.staticDir));
@@ -155,29 +159,33 @@ export function CreateServer(options: {
     }
   }
 
-  
   app.use(router.routes()).use(router.allowedMethods());
 
   let server = app.listen(options.port);
 
   app.context.permissionRoutes = routes;
 
-  if (options?.socketIoConfig?.allow) {
+  if (options?.socketIoConfig) {
     app.context.socketIO = require('socket.io')(server, {
       cors: {
         origin: '*',
         methods: ['GET', 'POST'],
+        credentials: true,
       },
     });
-  
+
     app.context.socketIO.on('connection', (socket: any) => {
       console.log('a user connected');
     });
 
     app.context.socketIO.use((socket: any, next: any) => {
-      signJwt(socket, next, options.jwt?.secret || '',options.socketIoConfig!.unsignedHost,options.socketIoConfig!.unsignedDelay);
+      signJwt(
+        socket,
+        next,
+        options.jwt?.secret || '',
+        options.socketIoConfig!.unsignedDelay
+      );
     });
-
   }
   return app;
 }
