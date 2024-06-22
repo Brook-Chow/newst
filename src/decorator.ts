@@ -1,23 +1,21 @@
 import 'reflect-metadata';
 import { Context } from 'koa';
+import { Opt } from '../index';
 
-export type Route = {
+export type IRoute = {
   path: string;
   method: string;
   fn: () => void;
   auth: boolean;
   name: string;
+  desc:string
 };
 
-type Opt = {
-  _auth?: boolean;
-  _path?: string;
-  _name?: string;
-};
+
 
 export const Module = (opt: Opt = {}): ClassDecorator => {
   return (target: any) => {
-    let tname = target.name.replace(/Controller$/, '');
+    const tname = target.name.replace(/Controller$/, '');
     Reflect.defineMetadata(
       'modulePath',
       `/${opt._path || tname.toLowerCase()}`,
@@ -31,6 +29,7 @@ export const Module = (opt: Opt = {}): ClassDecorator => {
     );
   };
 };
+
 
 export const Get = (opt: Opt = {}): MethodDecorator => {
   return (target: any, key: string | symbol, desctiptor: any) => {
@@ -72,12 +71,13 @@ function createRoute(
     );
   }
 
-  const route: Route = {
+  const route: IRoute = {
     path: '_path' in opt ? `/${opt._path}` : '', //`/${'_path' in opt ? opt._path : <string>key}`
     method: type,
     fn: desctiptor.value,
     auth: opt._auth ?? true,
-    name: opt._name ?? (key as string),
+    name: opt._name ?? <string>key,
+    desc:opt._desc??''
   };
   let routes = Reflect.getMetadata('moduleRoutes', target.constructor);
   !routes && (routes = []);
@@ -86,9 +86,6 @@ function createRoute(
 }
 
 
-export class Controller {
+export const Controller = class {
   ctx!: Context;
-  moduleAuth!: boolean;
-  modulePath!: string;
-  moduleName!: string;
 }

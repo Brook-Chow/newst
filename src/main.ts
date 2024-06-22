@@ -1,38 +1,18 @@
 require('dotenv').config();
 
-import Koa, { Context, Middleware } from 'koa';
+import Koa, { Context } from 'koa';
 import Router from 'koa-router';
 import KoaBody from 'koa-body';
 import KoaStatic from 'koa-static';
-import { checkJwt, signJwt } from './utils';
+import { checkJwtForSocket } from './utils';
 import path from 'path';
-import { AccessHeader, ControllerType } from '..';
-const router = new Router({ strict: true });
+import { ServerOptions } from '../index';
 
+const router = new Router({ strict: true });
 
 type AccessMethod = 'get' | 'put' | 'post' | 'delete';
 
-export function CreateServer(options: {
-  port: number;
-  controllers: ControllerType[];
-  middlewares?: Middleware[];
-  jwt?: {
-    enable: boolean;
-    secret: string;
-    fields: string[];
-  };
-  routerMiddwares?: Middleware[];
-  socketIoConfig?: {
-    unsignedDelay: number;
-  };
-  cors?: AccessHeader;
-  staticDir: string;
-  uploadConfig: {
-    uploadDir: string;
-    maxFileSize: number;
-    allowExts: string[];
-  };
-}) {
+export const CreateServer = (options: ServerOptions) => {
   let routes = [];
   for (let builder of options.controllers) {
     const instance = {
@@ -58,54 +38,20 @@ export function CreateServer(options: {
         auth: instance.moduleRoutes[key].auth,
         name: instance.moduleRoutes[key].name,
         pname: instance.moduleName,
+        desc:instance.moduleRoutes[key].desc,
       });
 
       router[<AccessMethod>instance.moduleRoutes[key].method](
         path,
         async (ctx: Context, next: any) => {
-          console.log(
-            '\x1b[44m%s\x1b[0m',
-            `[Route] ${instance.moduleRoutes[key].name}  path:${path}  method:${
-              instance.moduleRoutes[key].method
-            }  ${new Date().toLocaleString()}  `
-          );
-          ctx.request.body &&
-            Object.keys(ctx.request.body).length > 0 &&
-            console.table(ctx.request.body);
-          ctx.query && console.table(ctx.query);
-          ctx.param && console.table(ctx.param);
-
-          if (
-            !options.jwt?.enable ||
-            instance.moduleAuth === false ||
-            !instance.moduleRoutes[key].auth
-          ) {
-            await next();
-          } else {
-            try {
-              let signInfo = await checkJwt(ctx, options.jwt?.secret || '');
-
-              let fliterObjects: any = {};
-
-              for (let key of options.jwt.fields) {
-                if (signInfo.hasOwnProperty(key)) {
-                  fliterObjects[key] = signInfo[key];
-                }
-              }
-              ctx.state.user = fliterObjects;
-              await next();
-            } catch (error) {
-              console.log(error);
-              ctx.response.status = 401;
-              return (ctx.body = {
-                code: 401,
-                message: 'auth fail',
-                data: null,
-              });
-            }
-          }
+          ctx.instance = {
+            _moduleAuth: instance.moduleAuth,
+            _routeAuth: instance.moduleRoutes[key].auth,
+            _routeName: instance.moduleRoutes[key].name,
+          };
+          await next();
         },
-        ...(options.routerMiddwares||[]),
+        ...(options.routerMiddwares || []),
         async (ctx: Context, next: any) => {
           try {
             return await instance.moduleRoutes[key].fn.apply({ ctx });
@@ -136,8 +82,8 @@ export function CreateServer(options: {
           uploadDir: options.uploadConfig.uploadDir,
           keepExtensions: true,
           maxFileSize: options.uploadConfig.maxFileSize * 1024,
-          onFileBegin(name, file) {
-            let ext = path.extname(<string>file.originalFilename);
+          onFileBegin(_, file) {
+            const ext = path.extname(<string>file.originalFilename);
             if (
               !options.uploadConfig.allowExts.includes(
                 ext.substring(1).toLowerCase()
@@ -179,13 +125,13 @@ export function CreateServer(options: {
     });
 
     app.context.socketIO.use((socket: any, next: any) => {
-      signJwt(
+      checkJwtForSocket(
         socket,
         next,
-        options.jwt?.secret || '',
+        options.socketIoConfig!.jwtSecret || '',
         options.socketIoConfig!.unsignedDelay
       );
     });
   }
   return app;
-}
+};

@@ -1,7 +1,10 @@
-/// <reference path="../index.d.ts" />
-
-import Application, { Context, Middleware, BaseRequest, BaseContext } from 'koa';
-import {Server} from 'socket.io'
+import Application, {
+  Context,
+  Middleware,
+  BaseRequest,
+  BaseContext,
+} from 'koa';
+import { Server } from 'socket.io';
 import { ValidateSubmit } from './dist/utils';
 import { CreateServer } from './dist/main';
 import { Module, Get, Put, Post, Delete } from './dist/decorator';
@@ -9,18 +12,24 @@ import { ClassConstructor } from 'class-transformer';
 
 type Request<T, U> = BaseRequest & { body: T } & { files: U };
 
-
-type IContext = BaseContext & { permissionRoutes: any[], socketIO: Server };
+type IContext = BaseContext & { permissionRoutes: any[]; socketIO: Server };
 
 type App = Application & { context: IContext };
 
-type NewstContext = Context & { request: Request<any, any>, app:App};
 
+type Iinstance = {
+  _moduleAuth: boolean,
+  _routeAuth:boolean,
+  _routeName:string,
+}
 
-type Opt = {
+export type NewstContext = Context & { request: Request<any, any>; app: App,instance:Iinstance };
+
+export type Opt = {
   _auth?: boolean;
   _path?: string;
   _name?: string;
+  _desc?: string;
 };
 
 export type AccessHeader = {
@@ -29,36 +38,36 @@ export type AccessHeader = {
   'Access-Control-Allow-Methods'?: string;
 };
 
-export interface ControllerType {
-  new (): Controller;
+export class Controller {
+  ctx: NewstContext;
 }
 
+type ControllerType<T extends Controller> = T;
 
-export function CreateServer(options: {
+export type ServerOptions = {
   port: number;
   controllers: ControllerType[];
   middlewares?: Middleware[];
   routerMiddwares?: Middleware[];
-  jwt?: {
-    enable: boolean;
-    secret: string;
-    fields:string[]
-  };
   socketIoConfig?: {
-    unsignedDelay:number
-  }
+    unsignedDelay: number;
+    jwtSecret: string;
+  };
   cors?: AccessHeader;
   staticDir: string;
-  uploadConfig:{
+  uploadConfig: {
     uploadDir: string;
     maxFileSize: number;
-    allowExts:string[]
-  }
-}): Application;
+    allowExts: string[];
+  };
+};
+
+export function CreateServer(options: ServerOptions): Application;
 
 export function ValidateSubmit(
   cls: ClassConstructor<unknown>,
-  data: object
+  data: object,
+  strict?: boolean
 ): any;
 
 export function Module(opt?: Opt): ClassDecorator;
@@ -67,13 +76,7 @@ export function Put(opt?: Opt): MethodDecorator;
 export function Post(opt?: Opt): MethodDecorator;
 export function Delete(opt?: Opt): MethodDecorator;
 
-export class Controller {
-  ctx: NewstContext;
-  moduleAuth: boolean;
-  modulePath: string;
-  moduleName: string;
-}
-
-export * from 'socket.io'
+export * from 'socket.io';
+export * from 'class-transformer';
 export * from 'class-validator';
 export * as jwt from 'jsonwebtoken';

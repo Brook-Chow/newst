@@ -1,7 +1,7 @@
 {
   "name": "newst",
-  "version": "2.4.3",
-  "main": ".",
+  "version": "2.4.7",
+  "main": "dist/index.js",
   "license": "MIT",
   "scripts": {
     "build": "babel src --out-dir dist --extensions \".ts\" --source-maps inline"
@@ -34,6 +34,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/koa": "^2.15.0",
     "@types/koa-router": "^7.4.8",
-    "@types/koa-static": "^4.0.4"
+    "@types/koa-static": "^4.0.4",
+    "eslint": "^9.3.0"
   }
 }
